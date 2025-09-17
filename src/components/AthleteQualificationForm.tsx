@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import nextLogo from '@/assets/next-logo.png';
 import { ChevronLeft, ChevronRight, Trophy, Award, Target, User, MapPin, Calendar, Phone, Users, CheckCircle } from 'lucide-react';
+import VideoCallScheduler from './VideoCallScheduler';
 interface AthleteInfo {
   fullName: string;
   birthDate: string;
@@ -113,7 +114,7 @@ const AthleteQualificationForm = () => {
   const {
     toast
   } = useToast();
-  const [currentStep, setCurrentStep] = useState(0); // 0 = info form, 1-4 = questions, 5 = thank you
+  const [currentStep, setCurrentStep] = useState(0); // 0 = info form, 1-4 = questions, 5 = scheduler, 6 = thank you
   const [athleteInfo, setAthleteInfo] = useState<AthleteInfo>({
     fullName: '',
     birthDate: '',
@@ -123,6 +124,7 @@ const AthleteQualificationForm = () => {
   });
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [isWebhookLoading, setIsWebhookLoading] = useState(false);
+  const [schedulingData, setSchedulingData] = useState<any>(null);
   const handleAthleteInfoChange = (field: keyof AthleteInfo, value: string) => {
     setAthleteInfo(prev => ({
       ...prev,
@@ -218,43 +220,59 @@ const AthleteQualificationForm = () => {
     }
   };
   const nextStep = () => {
-    if (currentStep < 5) {
+    if (currentStep < 6) {
       setCurrentStep(prev => prev + 1);
 
-      // Se acabou as perguntas, calcular score e enviar webhook
+      // Se acabou as perguntas, só vai para o agendamento
       if (currentStep === 4) {
-        const totalScore = Object.values(answers).reduce((sum, points) => sum + points, 0);
-        const category = getScoreCategory(totalScore, answers);
-        const gates = checkGates(answers);
-        const leadData = {
-          timestamp: new Date().toISOString(),
-          testType: 'ab-athlete-mobile',
-          athleteInfo: athleteInfo,
-          qualification: {
-            totalScore: totalScore,
-            category: category.name,
-            description: category.description,
-            maxPossibleScore: 80
-          },
-          gates: {
-            gi_internacional: gates.gi,
-            go_ocupacao: gates.go,
-            ge_escolaridade: gates.ge,
-            hasAnyGate: gates.hasAnyGate
-          },
-          answers: questions.map(q => ({
-            questionId: q.id,
-            question: q.question,
-            copy: q.copy,
-            selectedPoints: answers[q.id] || 0,
-            selectedOption: q.options.find(opt => opt.points === answers[q.id])?.text || 'Não respondido',
-            gate: q.gate || null
-          })),
-          source: 'athlete-qualification-form-ab',
-          url: window.location.href
-        };
-        sendWebhookData(leadData);
+        // Não enviamos webhook aqui mais, só após o agendamento
       }
+    }
+  };
+
+  const handleScheduleComplete = async (schedulingDataReceived: any) => {
+    setSchedulingData(schedulingDataReceived);
+    
+    // Agora sim calculamos o score e enviamos tudo junto
+    const totalScore = Object.values(answers).reduce((sum, points) => sum + points, 0);
+    const category = getScoreCategory(totalScore, answers);
+    const gates = checkGates(answers);
+    
+    const leadData = {
+      timestamp: new Date().toISOString(),
+      testType: 'ab-athlete-mobile',
+      athleteInfo: athleteInfo,
+      qualification: {
+        totalScore: totalScore,
+        category: category.name,
+        description: category.description,
+        maxPossibleScore: 80
+      },
+      gates: {
+        gi_internacional: gates.gi,
+        go_ocupacao: gates.go,
+        ge_escolaridade: gates.ge,
+        hasAnyGate: gates.hasAnyGate
+      },
+      answers: questions.map(q => ({
+        questionId: q.id,
+        question: q.question,
+        copy: q.copy,
+        selectedPoints: answers[q.id] || 0,
+        selectedOption: q.options.find(opt => opt.points === answers[q.id])?.text || 'Não respondido',
+        gate: q.gate || null
+      })),
+      videoCallScheduling: schedulingDataReceived,
+      source: 'athlete-qualification-form-ab',
+      url: window.location.href
+    };
+
+    try {
+      await sendWebhookData(leadData);
+      setCurrentStep(6); // Vai para a página final
+    } catch (error) {
+      // Em caso de erro no webhook, ainda avança para mostrar o resultado
+      setCurrentStep(6);
     }
   };
   const prevStep = () => {
@@ -273,7 +291,7 @@ const AthleteQualificationForm = () => {
       parentPhone: ''
     });
   };
-  const progress = currentStep === 0 ? 0 : (currentStep - 1) / 4 * 100;
+  const progress = currentStep === 0 ? 0 : currentStep <= 4 ? (currentStep - 1) / 4 * 100 : 100;
 
   // Render identificação form
   if (currentStep === 0) {
@@ -374,8 +392,19 @@ const AthleteQualificationForm = () => {
       </div>;
   }
 
-  // Render thank you page with score
+  // Render video call scheduler
   if (currentStep === 5) {
+    return (
+      <VideoCallScheduler 
+        athleteInfo={athleteInfo}
+        onScheduleComplete={handleScheduleComplete}
+        isLoading={isWebhookLoading}
+      />
+    );
+  }
+
+  // Render thank you page with score
+  if (currentStep === 6) {
     const totalScore = Object.values(answers).reduce((sum, points) => sum + points, 0);
     const maxScore = 80;
     const scorePercentage = Math.round(totalScore / maxScore * 100);
@@ -451,6 +480,32 @@ const AthleteQualificationForm = () => {
                 </div>
               </div>
               
+              {/* Agendamento Confirmado */}
+              {schedulingData && (
+                <div className="bg-primary-blue/10 border border-primary-blue/20 rounded-xl p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-primary-blue/20 rounded-full flex items-center justify-center">
+                      <CheckCircle className="w-5 h-5 text-primary-blue" />
+                    </div>
+                    <div>
+                      <h4 className="text-light-text font-semibold text-base">Agendamento Confirmado</h4>
+                      <p className="text-light-text/70 text-sm">Sua vídeo-chamada foi agendada</p>
+                    </div>
+                  </div>
+                  <div className="bg-dark-surface/30 rounded-lg p-4 border border-primary-blue/20">
+                    <p className="text-primary-blue font-semibold text-lg mb-1">
+                      {schedulingData.scheduledDate} às {schedulingData.scheduledTime}
+                    </p>
+                    <p className="text-light-text text-sm mb-2">
+                      <strong>Participantes:</strong> {schedulingData.athleteName} + {schedulingData.parentName}
+                    </p>
+                    <p className="text-light-text/70 text-xs">
+                      Nossa equipe entrará em contato via WhatsApp ({schedulingData.parentPhone}) antes da reunião com o link da videochamada.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Next Steps */}
               <div className="space-y-4">
                 <h4 className="text-light-text font-semibold text-center mb-4">Próximos Passos</h4>
