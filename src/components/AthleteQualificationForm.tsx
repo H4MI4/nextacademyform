@@ -219,13 +219,50 @@ const AthleteQualificationForm = () => {
       setIsWebhookLoading(false);
     }
   };
-  const nextStep = () => {
+  const nextStep = async () => {
     if (currentStep < 6) {
       setCurrentStep(prev => prev + 1);
 
-      // Se acabou as perguntas, só vai para o agendamento
+      // Se acabou as perguntas e vai para agendamento, enviar primeiro webhook
       if (currentStep === 4) {
-        // Não enviamos webhook aqui mais, só após o agendamento
+        const totalScore = Object.values(answers).reduce((sum, points) => sum + points, 0);
+        const category = getScoreCategory(totalScore, answers);
+        const gates = checkGates(answers);
+        
+        const leadData = {
+          timestamp: new Date().toISOString(),
+          testType: 'ab-athlete-mobile-pre-scheduling',
+          athleteInfo: athleteInfo,
+          qualification: {
+            totalScore: totalScore,
+            category: category.name,
+            description: category.description,
+            maxPossibleScore: 80
+          },
+          gates: {
+            gi_internacional: gates.gi,
+            go_ocupacao: gates.go,
+            ge_escolaridade: gates.ge,
+            hasAnyGate: gates.hasAnyGate
+          },
+          answers: questions.map(q => ({
+            questionId: q.id,
+            question: q.question,
+            copy: q.copy,
+            selectedPoints: answers[q.id] || 0,
+            selectedOption: q.options.find(opt => opt.points === answers[q.id])?.text || 'Não respondido',
+            gate: q.gate || null
+          })),
+          stage: 'entered-scheduling-screen',
+          source: 'athlete-qualification-form-ab',
+          url: window.location.href
+        };
+
+        try {
+          await sendWebhookData(leadData);
+        } catch (error) {
+          console.log('Erro no primeiro webhook, mas continuando...');
+        }
       }
     }
   };

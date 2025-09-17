@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
+
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -172,21 +172,45 @@ const VideoCallScheduler: React.FC<VideoCallSchedulerProps> = ({
                   Selecione a data
                 </Label>
                 <div className="bg-dark-surface/50 rounded-xl border border-border-color p-3">
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={handleDateSelect}
-                    disabled={(date) => {
-                      // Só hoje e amanhã são permitidos
-                      const dateStr = format(date, 'yyyy-MM-dd');
-                      const todayStr = format(today, 'yyyy-MM-dd');
-                      const tomorrowStr = format(tomorrow, 'yyyy-MM-dd');
-                      return dateStr !== todayStr && dateStr !== tomorrowStr;
-                    }}
-                    initialFocus
-                    className="p-3 pointer-events-auto"
-                    locale={ptBR}
-                  />
+                  <div className="grid grid-cols-1 gap-3">
+                    {/* Botão HOJE */}
+                    <Button
+                      variant={selectedDate && format(selectedDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd') ? "default" : "outline"}
+                      onClick={() => handleDateSelect(today)}
+                      className={`w-full justify-start transition-all duration-200 ${
+                        selectedDate && format(selectedDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')
+                          ? 'bg-primary-blue text-white shadow-blue' 
+                          : 'bg-dark-surface/50 border-border-color text-light-text hover:border-primary-blue/50'
+                      }`}
+                    >
+                      <CalendarIcon className="w-4 h-4 mr-3" />
+                      <div className="text-left">
+                        <div className="font-medium">HOJE</div>
+                        <div className="text-xs opacity-80">
+                          {format(today, "dd/MM/yyyy - EEEE", { locale: ptBR })}
+                        </div>
+                      </div>
+                    </Button>
+
+                    {/* Botão AMANHÃ */}
+                    <Button
+                      variant={selectedDate && format(selectedDate, 'yyyy-MM-dd') === format(tomorrow, 'yyyy-MM-dd') ? "default" : "outline"}
+                      onClick={() => handleDateSelect(tomorrow)}
+                      className={`w-full justify-start transition-all duration-200 ${
+                        selectedDate && format(selectedDate, 'yyyy-MM-dd') === format(tomorrow, 'yyyy-MM-dd')
+                          ? 'bg-primary-blue text-white shadow-blue' 
+                          : 'bg-dark-surface/50 border-border-color text-light-text hover:border-primary-blue/50'
+                      }`}
+                    >
+                      <CalendarIcon className="w-4 h-4 mr-3" />
+                      <div className="text-left">
+                        <div className="font-medium">AMANHÃ</div>
+                        <div className="text-xs opacity-80">
+                          {format(tomorrow, "dd/MM/yyyy - EEEE", { locale: ptBR })}
+                        </div>
+                      </div>
+                    </Button>
+                  </div>
                 </div>
               </div>
 
