@@ -21,18 +21,19 @@ interface AthleteInfo {
 interface Question {
   id: number;
   question: string;
-  copy: string;
   options: {
     text: string;
     points: number;
     isHighlighted?: boolean;
   }[];
-  gate?: 'GI' | 'GO' | 'GE';
+  gate?: 'GI' | 'GO' | 'GE' | 'GN';
+  isConditional?: boolean;
+  showIf?: (answers: Record<number, number>) => boolean;
 }
+
 const questions: Question[] = [{
   id: 1,
-  question: "Experiência Internacional",
-  copy: "Você ou sua família já tiveram alguma experiência internacional?",
+  question: "Você ou sua família já tiveram alguma experiência internacional?",
   gate: 'GI',
   options: [{
     text: "Nunca viajamos",
@@ -51,70 +52,113 @@ const questions: Question[] = [{
   }]
 }, {
   id: 2,
-  question: "Ocupação dos responsáveis",
-  copy: "Qual a principal ocupação dos responsáveis pelo atleta?",
+  question: "Qual a principal ocupação dos responsáveis pelo atleta?",
   gate: 'GO',
   options: [{
     text: "Alta gestão / Empresários / Executivos",
     points: 24,
     isHighlighted: true
   }, {
-    text: "Profissões de nível superior",
+    text: "Nível superior (médicos, advogados, engenheiros)",
     points: 18,
     isHighlighted: true
   }, {
-    text: "Técnicas",
+    text: "Nível técnico (técnicos, supervisores)",
     points: 12
   }, {
-    text: "Operacionais / Autônomos",
+    text: "Operacional (vendedores, operadores)",
     points: 8
   }, {
-    text: "Informal / Desempregado",
+    text: "Serviços gerais (limpeza, segurança)",
     points: 4
   }]
 }, {
   id: 3,
-  question: "Nível de Escolaridade",
-  copy: "Qual é o seu nível de escolaridade atual?",
+  question: "Qual é o seu nível de escolaridade atual?",
   gate: 'GE',
   options: [{
     text: "Ensino Médio (1º ao 3º ano)",
     points: 20,
     isHighlighted: true
   }, {
-    text: "Ensino Superior (cursando ou completo)",
+    text: "Ensino Superior (graduação)",
     points: 16,
     isHighlighted: true
   }, {
-    text: "Fundamental II (6º ao 9º ano)",
-    points: 10
+    text: "Ensino Fundamental (6º ao 9º ano)",
+    points: 12
   }, {
-    text: "Fundamental I (1º ao 5º ano)",
+    text: "Ensino Fundamental (1º ao 5º ano)",
+    points: 8
+  }, {
+    text: "Não frequento a escola",
     points: 6
   }]
 }, {
   id: 4,
-  question: "Tempo de conhecimento da Next",
-  copy: "Há quanto tempo você conhece a Next Academy?",
+  question: "Há quanto tempo você conhece a Next Academy?",
   options: [{
     text: "Mais de 2 anos",
     points: 12
   }, {
-    text: "Entre 6 meses e 2 anos",
+    text: "Entre 1 e 2 anos",
     points: 10
   }, {
-    text: "Menos de 6 meses",
+    text: "Entre 6 meses e 1 ano",
     points: 8
+  }, {
+    text: "Menos de 6 meses",
+    points: 7
   }, {
     text: "Esta é a primeira vez que ouço falar",
     points: 6
   }]
+}, {
+  id: 5,
+  question: "Há quanto tempo você pratica futebol de forma contínua/regular?",
+  options: [{
+    text: "Mais de 5 anos",
+    points: 10
+  }, {
+    text: "Entre 3 e 4 anos",
+    points: 7
+  }, {
+    text: "Entre 1 e 2 anos",
+    points: 4
+  }, {
+    text: "Menos de 1 ano",
+    points: 0
+  }]
+}, {
+  id: 6,
+  question: "Já participou de algum evento da Next Academy?",
+  gate: 'GN',
+  isConditional: true,
+  showIf: (answers) => {
+    // Mostra apenas se não respondeu "Esta é a primeira vez que ouço falar" na pergunta 4
+    return answers[4] !== 6;
+  },
+  options: [{
+    text: "Nunca participei",
+    points: 0
+  }, {
+    text: "Seletiva (peneira)",
+    points: 4
+  }, {
+    text: "Torneio organizado pela Next",
+    points: 8
+  }, {
+    text: "Imersão/treinamento com jogadores",
+    points: 12,
+    isHighlighted: true
+  }]
 }];
+
 const AthleteQualificationForm = () => {
   const {
     toast
   } = useToast();
-  const [currentStep, setCurrentStep] = useState(0); // 0 = info form, 1-4 = questions, 5 = scheduler, 6 = thank you
+  const [currentStep, setCurrentStep] = useState(0); // 0 = info form, 1-6 = questions, 7 = scheduler, 8 = thank you
   const [athleteInfo, setAthleteInfo] = useState<AthleteInfo>({
     fullName: '',
     birthDate: '',
@@ -137,12 +181,32 @@ const AthleteQualificationForm = () => {
       [questionId]: points
     }));
   };
+
+  // Função para obter perguntas visíveis baseado nas respostas atuais
+  const getVisibleQuestions = () => {
+    return questions.filter(q => {
+      if (!q.isConditional) return true;
+      return q.showIf ? q.showIf(answers) : true;
+    });
+  };
+
+  // Função para obter a pergunta atual baseada no step
+  const getCurrentQuestion = () => {
+    const visibleQuestions = getVisibleQuestions();
+    return visibleQuestions[currentStep - 1];
+  };
+
+  // Função para calcular o total de perguntas visíveis
+  const getTotalQuestions = () => {
+    return getVisibleQuestions().length;
+  };
   const isAthleteInfoValid = () => {
     return athleteInfo.fullName && athleteInfo.birthDate && athleteInfo.cityState && athleteInfo.parentName && athleteInfo.parentPhone;
   };
   const isCurrentQuestionAnswered = () => {
     if (currentStep === 0) return isAthleteInfoValid();
-    return answers[currentStep] !== undefined;
+    const currentQuestion = getCurrentQuestion();
+    return currentQuestion ? answers[currentQuestion.id] !== undefined : false;
   };
   const checkGates = (answers: Record<number, number>) => {
     // GI - Internacional: Intercâmbio/curso (16) ou Campeonato/treino (24)
@@ -153,43 +217,39 @@ const AthleteQualificationForm = () => {
 
     // GE - Escolaridade: Ensino Médio (20) ou Superior (16)
     const ge = answers[3] === 20 || answers[3] === 16;
+
+    // GN - Next: Imersão/treinamento com jogadores (12)
+    const gn = answers[6] === 12;
+
     return {
       gi,
       go,
       ge,
-      hasAnyGate: gi || go || ge
+      gn,
+      hasAnyGate: gi || go || ge || gn
     };
   };
   const getScoreCategory = (score: number, answers: Record<number, number>) => {
     const gates = checkGates(answers);
-    if (score <= 35) {
+    
+    if (score <= 54) {
       return {
         name: "🎯 SELETIVA",
-        points: "0-35 pontos",
+        points: "0-54 pontos",
         color: "seletiva",
         description: "Entrada Básica",
         icon: Target
       };
     }
-    if (score >= 61 && gates.hasAnyGate) {
-      return {
-        name: "🚀 EMBARQUES",
-        points: "≥61 pontos + Gates",
-        color: "embarques",
-        description: "Qualificação Premium",
-        icon: Trophy,
-        gates: gates
-      };
-    }
 
-    // Se score >= 61 mas sem gates, vai para Comercial
-    // Ou se score está entre 36-60
+    // Score de 55 a 102 pontos = COMERCIAL
     return {
       name: "💼 COMERCIAL",
-      points: score >= 61 ? "≥61 pontos (sem gates)" : "36-60 pontos",
+      points: "55-102 pontos",
       color: "comercial",
-      description: score >= 61 ? "Rebaixado - Sem Gates" : "Qualificação Média",
-      icon: Award
+      description: "Qualificação Comercial",
+      icon: Award,
+      gates: gates
     };
   };
   const sendSchedulingWebhook = async (leadData: any) => {
@@ -248,11 +308,14 @@ const AthleteQualificationForm = () => {
     }
   };
   const nextStep = async () => {
-    if (currentStep < 6) {
+    const totalQuestions = getTotalQuestions();
+    const maxStep = totalQuestions + 2; // +2 para scheduler e thank you
+    
+    if (currentStep < maxStep) {
       setCurrentStep(prev => prev + 1);
 
       // Se acabou as perguntas e vai para agendamento, enviar primeiro webhook
-      if (currentStep === 4) {
+      if (currentStep === totalQuestions) {
         const totalScore = Object.values(answers).reduce((sum, points) => sum + points, 0);
         const category = getScoreCategory(totalScore, answers);
         const gates = checkGates(answers);
@@ -265,18 +328,18 @@ const AthleteQualificationForm = () => {
             totalScore: totalScore,
             category: category.name,
             description: category.description,
-            maxPossibleScore: 80
+            maxPossibleScore: 102
           },
           gates: {
             gi_internacional: gates.gi,
             go_ocupacao: gates.go,
             ge_escolaridade: gates.ge,
+            gn_next: gates.gn,
             hasAnyGate: gates.hasAnyGate
           },
-          answers: questions.map(q => ({
+          answers: getVisibleQuestions().map(q => ({
             questionId: q.id,
             question: q.question,
-            copy: q.copy,
             selectedPoints: answers[q.id] || 0,
             selectedOption: q.options.find(opt => opt.points === answers[q.id])?.text || 'Não respondido',
             gate: q.gate || null
@@ -311,18 +374,18 @@ const AthleteQualificationForm = () => {
         totalScore: totalScore,
         category: category.name,
         description: category.description,
-        maxPossibleScore: 80
+        maxPossibleScore: 102
       },
       gates: {
         gi_internacional: gates.gi,
         go_ocupacao: gates.go,
         ge_escolaridade: gates.ge,
+        gn_next: gates.gn,
         hasAnyGate: gates.hasAnyGate
       },
-      answers: questions.map(q => ({
+      answers: getVisibleQuestions().map(q => ({
         questionId: q.id,
         question: q.question,
-        copy: q.copy,
         selectedPoints: answers[q.id] || 0,
         selectedOption: q.options.find(opt => opt.points === answers[q.id])?.text || 'Não respondido',
         gate: q.gate || null
@@ -334,10 +397,12 @@ const AthleteQualificationForm = () => {
 
     try {
       await sendSchedulingWebhook(leadData);
-      setCurrentStep(6); // Vai para a página final
+      const totalQuestions = getTotalQuestions();
+      setCurrentStep(totalQuestions + 2); // Vai para a página final
     } catch (error) {
       // Em caso de erro no webhook, ainda avança para mostrar o resultado
-      setCurrentStep(6);
+      const totalQuestions = getTotalQuestions();
+      setCurrentStep(totalQuestions + 2);
     }
   };
   const prevStep = () => {
@@ -356,7 +421,8 @@ const AthleteQualificationForm = () => {
       parentPhone: ''
     });
   };
-  const progress = currentStep === 0 ? 0 : currentStep <= 4 ? (currentStep - 1) / 4 * 100 : 100;
+  const totalQuestions = getTotalQuestions();
+  const progress = currentStep === 0 ? 0 : currentStep <= totalQuestions ? (currentStep - 1) / totalQuestions * 100 : 100;
 
   // Render identificação form
   if (currentStep === 0) {
@@ -458,7 +524,7 @@ const AthleteQualificationForm = () => {
   }
 
   // Render video call scheduler
-  if (currentStep === 5) {
+  if (currentStep === totalQuestions + 1) {
     return (
       <VideoCallScheduler 
         athleteInfo={athleteInfo}
@@ -469,164 +535,127 @@ const AthleteQualificationForm = () => {
   }
 
   // Render thank you page with score
-  if (currentStep === 6) {
+  if (currentStep === totalQuestions + 2) {
     const totalScore = Object.values(answers).reduce((sum, points) => sum + points, 0);
-    const maxScore = 80;
-    const scorePercentage = Math.round(totalScore / maxScore * 100);
-    return <div className="min-h-screen bg-gradient-primary relative overflow-hidden pattern-grid">
-        {/* Background Effects */}
+    
+    return (
+      <div className="min-h-screen bg-gradient-primary relative overflow-hidden pattern-grid">
+        {/* Background Effects - mantendo padrão atual */}
         <div className="absolute inset-0 bg-gradient-geometric opacity-10"></div>
         <div className="absolute inset-0 bg-gradient-glow opacity-5"></div>
         
-        {/* Floating Elements */}
-        <div className="absolute top-10 right-5 w-32 h-32 bg-primary-blue/10 rounded-full blur-2xl animate-pulse"></div>
-        <div className="absolute bottom-20 left-5 w-40 h-40 bg-accent-blue/5 rounded-full blur-3xl" style={{
-        animationDelay: '1s'
-      }}></div>
-        <div className="absolute top-1/2 right-10 w-16 h-16 bg-embarques/8 rounded-full blur-xl float"></div>
+        {/* Floating elements menores para não interferir no print */}
+        <div className="absolute top-10 right-5 w-16 h-16 bg-primary-blue/5 rounded-full blur-xl float"></div>
+        <div className="absolute bottom-10 left-5 w-20 h-20 bg-accent-blue/3 rounded-full blur-2xl" style={{ animationDelay: '1s' }}></div>
         
-        <div className="relative z-10 p-4 flex items-center justify-center min-h-screen">
-          <Card className="w-full max-w-lg card-glow shadow-blue-lg border-primary-blue/10 backdrop-blur-md overflow-hidden">
+        <div className="relative z-10 p-3 flex items-center justify-center min-h-screen">
+          <Card className="w-full max-w-md card-glow shadow-blue-lg border-primary-blue/10 backdrop-blur-md overflow-hidden">
             <div className="absolute inset-0 bg-gradient-blue opacity-10 blur-sm"></div>
             
-            <CardHeader className="relative text-center pb-6 px-8 pt-8">
-              {/* Success Animation */}
-              <div className="flex justify-center mb-6">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-primary-blue/30 rounded-full blur-2xl animate-ping"></div>
-                  <div className="absolute inset-0 bg-primary-blue/20 rounded-full blur-xl"></div>
-                  <div className="relative bg-primary-blue/10 p-6 rounded-full border-2 border-primary-blue/30">
-                    <CheckCircle className="w-16 h-16 text-primary-blue hover-scale" />
-                  </div>
+            {/* Header Compacto - Parabéns */}
+            <CardHeader className="relative text-center py-4 px-4">
+              <div className="flex justify-center mb-3">
+                <div className="w-12 h-12 bg-primary-blue/20 rounded-full flex items-center justify-center">
+                  <Trophy className="w-6 h-6 text-primary-blue" />
                 </div>
               </div>
               
-              <CardTitle className="text-2xl font-bold text-light-text mb-4 text-shimmer">
-                🎉 Qualificação Concluída!
+              <CardTitle className="text-lg font-bold text-light-text mb-1 text-shimmer">
+                🏆 Parabéns!
               </CardTitle>
-              <CardDescription className="text-light-text/90 text-base leading-relaxed mb-6">
-                Aqui está o resultado da sua avaliação
+              <CardDescription className="text-light-text/80 text-xs">
+                Avaliação concluída
               </CardDescription>
-              
-              {/* Next Academy Logo */}
-              <div className="flex justify-center mb-4">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-primary-blue/15 rounded-full blur-xl"></div>
-                  <img src={nextLogo} alt="Next Academy Logo" className="relative h-8 w-auto filter brightness-0 invert opacity-80" />
-                </div>
-              </div>
             </CardHeader>
             
-            <CardContent className="relative space-y-6 px-8 pb-8">
-              {/* Score Card */}
-              <div className="bg-gradient-to-br from-primary-blue/20 to-accent-blue/15 p-8 rounded-2xl border border-primary-blue/30 backdrop-blur-sm relative overflow-hidden">
-                {/* Background pattern */}
-                <div className="absolute inset-0 bg-gradient-geometric opacity-5"></div>
-                
-                <div className="relative text-center">
-                  <Trophy className="w-12 h-12 text-primary-blue mx-auto mb-4 hover-scale" />
-                  
-                  <h3 className="text-light-text font-bold text-lg mb-2">Sua Pontuação</h3>
-                  
-                  {/* Large score display */}
-                  <div className="my-6">
-                    <div className="text-6xl font-bold text-primary-blue mb-2 text-shimmer">
-                      {totalScore}
-                    </div>
-                    
-                    
-                  </div>
-                  
-                  {/* Progress bar */}
-                  
-                  
-                  <p className="text-light-text/80 text-sm leading-relaxed">
-                </p>
+            <CardContent className="relative p-4 space-y-3">
+              
+              {/* Pontuação - Destaque Principal Compacto */}
+              <div className="text-center py-4 bg-gradient-to-br from-primary-blue/20 to-accent-blue/15 rounded-xl border border-primary-blue/30 backdrop-blur-sm">
+                <h3 className="text-light-text font-semibold text-sm mb-2">Sua Pontuação</h3>
+                <div className="text-4xl font-bold text-primary-blue mb-1 text-shimmer">
+                  {totalScore}
                 </div>
               </div>
-              
-              {/* Agendamento Confirmado */}
+
+              {/* Entrevista Marcada - Compacta */}
               {schedulingData && (
-                <div className="bg-primary-blue/10 border border-primary-blue/20 rounded-xl p-6">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 bg-primary-blue/20 rounded-full flex items-center justify-center">
-                      <CheckCircle className="w-5 h-5 text-primary-blue" />
-                    </div>
-                    <div>
-                      <h4 className="text-light-text font-semibold text-base">Agendamento Confirmado</h4>
-                      <p className="text-light-text/70 text-sm">Sua vídeo-chamada foi agendada</p>
-                    </div>
+                <div className="bg-primary-blue/10 border border-primary-blue/20 rounded-xl p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Calendar className="w-4 h-4 text-primary-blue" />
+                    <h4 className="font-semibold text-light-text text-sm">Entrevista marcada</h4>
                   </div>
-                  <div className="bg-dark-surface/30 rounded-lg p-4 border border-primary-blue/20">
-                    <p className="text-primary-blue font-semibold text-lg mb-1">
-                      {schedulingData.scheduledDate} às {schedulingData.scheduledTime}
+                  
+                  <div className="space-y-1 text-xs text-light-text/90">
+                    <p className="font-medium text-primary-blue text-sm">
+                      {new Date(schedulingData.scheduledDate).toLocaleDateString('pt-BR')} às {schedulingData.scheduledTime}
                     </p>
-                    <p className="text-light-text text-sm mb-2">
-                      <strong>Participantes:</strong> {schedulingData.athleteName} + {schedulingData.parentName}
-                    </p>
-                    <p className="text-light-text/70 text-xs">
-                      Nossa equipe entrará em contato via WhatsApp ({schedulingData.parentPhone}) antes da reunião com o link da videochamada.
+                    <p><strong>Atleta:</strong> {schedulingData.athleteName}</p>
+                    <p><strong>Responsável:</strong> {schedulingData.parentName}</p>
+                    <p className="text-xs text-light-text/60 italic">
+                      Telefone do responsável: {schedulingData.parentPhone}
                     </p>
                   </div>
                 </div>
               )}
 
-              {/* Next Steps */}
-              <div className="space-y-4">
-                <h4 className="text-light-text font-semibold text-center mb-4">Próximos Passos</h4>
+              {/* Respostas do Formulário - Ultra Compactas */}
+              <div className="bg-dark-surface/30 border border-primary-blue/20 rounded-xl p-3">
+                <h4 className="font-semibold text-light-text mb-2 flex items-center gap-2 text-sm">
+                  <CheckCircle className="w-4 h-4 text-primary-blue" />
+                  Respostas
+                </h4>
                 
-                <div className="flex items-start gap-4 p-4 bg-primary-blue/5 rounded-xl border border-primary-blue/20">
-                  <div className="flex-shrink-0 w-8 h-8 bg-primary-blue/20 rounded-full flex items-center justify-center mt-1">
-                    <span className="text-primary-blue font-bold text-sm">1</span>
-                  </div>
-                  <div>
-                    <p className="text-light-text font-medium text-sm mb-1">Análise Detalhada</p>
-                    <p className="text-light-text/70 text-xs">Nossa equipe analisará seu perfil completo</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start gap-4 p-4 bg-accent-blue/5 rounded-xl border border-accent-blue/20">
-                  <div className="flex-shrink-0 w-8 h-8 bg-accent-blue/20 rounded-full flex items-center justify-center mt-1">
-                    <span className="text-accent-blue font-bold text-sm">2</span>
-                  </div>
-                  <div>
-                    <p className="text-light-text font-medium text-sm mb-1">Contato Personalizado</p>
-                    <p className="text-light-text/70 text-xs">Retorno em até 48h com oportunidades específicas</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start gap-4 p-4 bg-embarques/5 rounded-xl border border-embarques/20">
-                  <div className="flex-shrink-0 w-8 h-8 bg-embarques/20 rounded-full flex items-center justify-center mt-1">
-                    <span className="text-embarques font-bold text-sm">3</span>
-                  </div>
-                  <div>
-                    <p className="text-light-text font-medium text-sm mb-1">Desenvolvimento</p>
-                    <p className="text-light-text/70 text-xs">Orientações para maximizar seu potencial</p>
-                  </div>
+                <div className="space-y-2">
+                  {getVisibleQuestions().map((q, index) => {
+                    const selectedOption = q.options.find(opt => opt.points === answers[q.id]);
+                    return (
+                      <div key={q.id} className="border-l-2 border-primary-blue/30 pl-2 py-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="text-xs font-medium text-light-text/70">
+                            P{index + 1}
+                          </div>
+                        </div>
+                        <div className="text-xs text-light-text/90 mb-1 leading-tight line-clamp-2">
+                          {q.question}
+                        </div>
+                        <div className="text-xs font-medium text-primary-blue/90 leading-tight">
+                          {selectedOption?.text || 'Não respondido'}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-              
+
               {/* Loading indicator */}
-              {isWebhookLoading && <div className="flex items-center justify-center gap-3 p-4 bg-primary-blue/10 rounded-xl border border-primary-blue/30">
-                  <div className="spinner w-5 h-5"></div>
-                  <span className="text-primary-blue font-medium text-sm">Finalizando envio...</span>
-                </div>}
+              {isWebhookLoading && (
+                <div className="flex items-center justify-center gap-2 p-2 bg-primary-blue/10 rounded-xl">
+                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary-blue"></div>
+                  <span className="text-primary-blue font-medium text-xs">Finalizando...</span>
+                </div>
+              )}
               
-              {/* Footer message */}
-              <div className="text-center pt-4 border-t border-primary-blue/20">
+              {/* Footer Compacto */}
+              <div className="text-center pt-2 border-t border-primary-blue/20">
+                <div className="flex justify-center mb-1">
+                  <img src={nextLogo} alt="Next Academy" className="h-4 w-auto filter brightness-0 invert opacity-60" />
+                </div>
                 <p className="text-light-text/60 text-xs">
-                  Obrigado por confiar na Next Academy para seu desenvolvimento esportivo
+                  Obrigado pela confiança!
                 </p>
               </div>
+              
             </CardContent>
           </Card>
         </div>
-      </div>;
+      </div>
+    );
   }
 
   // Render questions
-  const question = questions[currentStep - 1];
-  const selectedAnswer = answers[currentStep];
+  const question = getCurrentQuestion();
+  const selectedAnswer = question ? answers[question.id] : undefined;
   return <div className="min-h-screen bg-gradient-primary relative overflow-hidden pattern-grid">
       {/* Background Effects */}
       <div className="absolute inset-0 bg-gradient-geometric opacity-10"></div>
@@ -650,18 +679,12 @@ const AthleteQualificationForm = () => {
             </div>
             
             <Badge variant="outline" className="border-primary-blue text-primary-blue mx-auto mb-4 px-3 py-1 text-xs font-semibold">
-              Pergunta {currentStep} de 4
+              Pergunta {currentStep} de {totalQuestions}
             </Badge>
             
             <CardTitle className="text-lg font-bold text-light-text mb-2">
-              {question.question}
-              {question.gate && <span className="ml-2 px-2 py-1 bg-primary-blue/20 text-primary-blue text-xs rounded font-normal">
-                  Gate {question.gate}
-                </span>}
+              {question?.question}
             </CardTitle>
-            <CardDescription className="text-light-text/80 text-sm">
-              {question.copy}
-            </CardDescription>
             
             <div className="mt-4">
               <Progress value={progress} className="h-2 rounded-full bg-dark-surface/50" />
@@ -669,8 +692,8 @@ const AthleteQualificationForm = () => {
           </CardHeader>
           
           <CardContent className="relative space-y-4 px-6 pb-6">
-            <RadioGroup value={selectedAnswer?.toString()} onValueChange={value => handleAnswer(currentStep, parseInt(value))} className="space-y-3">
-              {question.options.map((option, index) => <div key={index} className={`
+            <RadioGroup value={selectedAnswer?.toString()} onValueChange={value => handleAnswer(question?.id || 0, parseInt(value))} className="space-y-3">
+              {question?.options?.map((option, index) => <div key={index} className={`
                     flex items-center space-x-3 p-3 rounded-xl border transition-all duration-300 cursor-pointer hover:scale-[1.02]
                     border-border-color bg-dark-surface/30
                     ${selectedAnswer === option.points ? 'border-primary-blue bg-primary-blue/10 shadow-blue' : 'hover:border-primary-blue/50'}
@@ -690,7 +713,7 @@ const AthleteQualificationForm = () => {
               </Button>
               
               <Button onClick={nextStep} disabled={!isCurrentQuestionAnswered()} className="flex-1 bg-gradient-button hover:bg-gradient-button-hover text-white font-bold transition-all duration-300 py-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed shadow-blue btn-glow hover-scale rounded-xl">
-                {currentStep === 4 ? 'Finalizar' : 'Próxima'}
+                {currentStep === totalQuestions ? 'Finalizar' : 'Próxima'}
                 <ChevronRight className="w-4 h-4 ml-2" />
               </Button>
             </div>
