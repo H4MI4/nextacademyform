@@ -192,6 +192,34 @@ const AthleteQualificationForm = () => {
       icon: Award
     };
   };
+  const sendSchedulingWebhook = async (leadData: any) => {
+    setIsWebhookLoading(true);
+    try {
+      const webhookUrl = 'https://raulgeremia11.app.n8n.cloud/webhook-test/agendamento-leadscore';
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(leadData)
+      });
+      console.log('Webhook de agendamento enviado com sucesso:', leadData);
+      toast({
+        title: "✅ Agendamento confirmado",
+        description: "Sua vídeo-chamada foi agendada com sucesso!"
+      });
+    } catch (error) {
+      console.error('Erro ao enviar webhook de agendamento:', error);
+      toast({
+        title: "⚠️ Aviso",
+        description: "Agendamento salvo localmente. Nossa equipe entrará em contato.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsWebhookLoading(false);
+    }
+  };
+
   const sendWebhookData = async (leadData: any) => {
     setIsWebhookLoading(true);
     try {
@@ -305,7 +333,7 @@ const AthleteQualificationForm = () => {
     };
 
     try {
-      await sendWebhookData(leadData);
+      await sendSchedulingWebhook(leadData);
       setCurrentStep(6); // Vai para a página final
     } catch (error) {
       // Em caso de erro no webhook, ainda avança para mostrar o resultado

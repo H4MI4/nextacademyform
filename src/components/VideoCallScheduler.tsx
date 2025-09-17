@@ -34,14 +34,11 @@ const VideoCallScheduler: React.FC<VideoCallSchedulerProps> = ({
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [selectedTime, setSelectedTime] = useState<string>('');
 
-  // Gerar horários disponíveis (10:00 às 23:00)
+  // Gerar horários disponíveis (10:00 às 22:00)
   const generateTimeSlots = () => {
     const slots = [];
     for (let hour = 10; hour <= 22; hour++) {
       slots.push(`${hour.toString().padStart(2, '0')}:00`);
-      if (hour < 22) { // Não adicionar 22:30 pois seria depois das 23:00
-        slots.push(`${hour.toString().padStart(2, '0')}:30`);
-      }
     }
     return slots;
   };
