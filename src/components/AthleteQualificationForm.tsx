@@ -33,10 +33,10 @@ interface Question {
 
 const questions: Question[] = [{
   id: 1,
-  question: "Você ou sua família já tiveram alguma experiência internacional?",
+  question: "Você já fez alguma viagem para fora do Brasil?",
   gate: 'GI',
   options: [{
-    text: "Nunca viajamos",
+    text: "Nunca viajei",
     points: 3
   }, {
     text: "Turismo",
@@ -115,22 +115,6 @@ const questions: Question[] = [{
   }]
 }, {
   id: 5,
-  question: "Há quanto tempo você pratica futebol de forma contínua/regular?",
-  options: [{
-    text: "Mais de 5 anos",
-    points: 10
-  }, {
-    text: "Entre 3 e 4 anos",
-    points: 7
-  }, {
-    text: "Entre 1 e 2 anos",
-    points: 4
-  }, {
-    text: "Menos de 1 ano",
-    points: 0
-  }]
-}, {
-  id: 6,
   question: "Já participou de algum evento da Next Academy?",
   gate: 'GN',
   isConditional: true,
@@ -158,7 +142,7 @@ const AthleteQualificationForm = () => {
   const {
     toast
   } = useToast();
-  const [currentStep, setCurrentStep] = useState(0); // 0 = info form, 1-6 = questions, 7 = scheduler, 8 = thank you
+  const [currentStep, setCurrentStep] = useState(0); // 0 = info form, 1-5 = questions, 6 = scheduler, 7 = thank you
   const [athleteInfo, setAthleteInfo] = useState<AthleteInfo>({
     fullName: '',
     birthDate: '',
@@ -219,7 +203,7 @@ const AthleteQualificationForm = () => {
     const ge = answers[3] === 20 || answers[3] === 16;
 
     // GN - Next: Imersão/treinamento com jogadores (12)
-    const gn = answers[6] === 12;
+    const gn = answers[5] === 12;
 
     return {
       gi,
@@ -232,20 +216,20 @@ const AthleteQualificationForm = () => {
   const getScoreCategory = (score: number, answers: Record<number, number>) => {
     const gates = checkGates(answers);
     
-    if (score <= 54) {
+    if (score <= 46) {
       return {
         name: "🎯 SELETIVA",
-        points: "0-54 pontos",
+        points: "0-46 pontos",
         color: "seletiva",
         description: "Entrada Básica",
         icon: Target
       };
     }
 
-    // Score de 55 a 102 pontos = COMERCIAL
+    // Score de 47 a 92 pontos = COMERCIAL
     return {
       name: "💼 COMERCIAL",
-      points: "55-102 pontos",
+      points: "47-92 pontos",
       color: "comercial",
       description: "Qualificação Comercial",
       icon: Award,
@@ -328,7 +312,7 @@ const AthleteQualificationForm = () => {
             totalScore: totalScore,
             category: category.name,
             description: category.description,
-            maxPossibleScore: 102
+            maxPossibleScore: 92
           },
           gates: {
             gi_internacional: gates.gi,
@@ -374,7 +358,7 @@ const AthleteQualificationForm = () => {
         totalScore: totalScore,
         category: category.name,
         description: category.description,
-        maxPossibleScore: 102
+        maxPossibleScore: 92
       },
       gates: {
         gi_internacional: gates.gi,
