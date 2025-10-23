@@ -52,7 +52,7 @@ export interface Question {
     points: number;
     isHighlighted?: boolean;
   }[];
-  gate?: 'GI' | 'GO' | 'GE';
+  gate?: 'GI' | 'GO' | 'GE' | 'GN';
 }
 
 // Interface para dados de agendamento
@@ -71,6 +71,7 @@ export interface QualificationGates {
   gi: boolean;
   go: boolean;
   ge: boolean;
+  gn: boolean;
   hasAnyGate: boolean;
 }
 
@@ -99,6 +100,7 @@ export interface WebhookData {
     gi_internacional: boolean;
     go_ocupacao: boolean;
     ge_escolaridade: boolean;
+    gn_next: boolean;
     hasAnyGate: boolean;
   };
   answers: {
